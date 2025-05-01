@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from pydantic import BaseModel, EmailStr
-from typing import Literal
+from typing import Literal, Optional
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
@@ -55,16 +55,16 @@ class TransferPayload(BaseModel):
     serial_number: str
     title: str
     subject: str
-    description: str
-    address: str
+    description: Optional[str] = None
+    address: Optional[str] = None
     school_code: str
     school_name: str
     province: str
     district: str
     reporter_name: str
-    phone: str
-    email: EmailStr
-    product_type: Literal["MPC1", "3DP1"]
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    product_type: str
 
 # Dependency
 
@@ -77,7 +77,7 @@ def get_db():
 
 def verify_api_key(x_api_key: str = Header(...)):
     if x_api_key != INTERNAL_API_KEY:
-        raise HTTPException(status_code=401, detail="Geçersiz API anahtarı.")
+        raise HTTPException(status_code=401, detail="Invalid API key")
 
 # API Endpoint
 @app.post("/transfer")
@@ -87,16 +87,21 @@ def transfer_call(
     _: None = Depends(verify_api_key)
 ):
     # Benzersiz ID kontrolü
-    existing = db.query(Call).filter(Call.external_call_id == data.external_call_id).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="external_call_id daha önce kullanılmış.")
+    if db.query(Call).filter(Call.external_call_id == data.external_call_id).first():
+        raise HTTPException(
+            status_code=409,
+            detail="This call ID is already registered. Please use a different call ID."
+        )
 
-    call = Call(**data.dict())
-    db.add(call)
-    db.commit()
-    db.refresh(call)
-    return {
-        "id": call.id,
-        "message": "New fault record created successfully."
-    }
+    try:
+        call = Call(**data.dict())
+        db.add(call)
+        db.commit()
+        db.refresh(call)
+        return {
+            "id": call.id,
+            "message": "New fault record created successfully."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create record: {str(e)}")
 
