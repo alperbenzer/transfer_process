@@ -13,6 +13,7 @@ load_dotenv()
 
 # API Key kontrol
 INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+CALLS_API_KEY = os.getenv("CALLS_API_KEY")
 
 # FastAPI app
 app = FastAPI(title="Aidata Transfer API", version="2.0")
@@ -79,7 +80,41 @@ def verify_api_key(x_api_key: str = Header(...)):
     if x_api_key != INTERNAL_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+def verify_calls_key(x_api_key: str = Header(...)):
+    if x_api_key != CALLS_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key for calls endpoint")
+
 # API Endpoint
+
+@app.get("/calls")
+def list_calls(
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_calls_key)
+):
+    calls = db.query(Call).order_by(Call.id.desc()).all()
+    return [
+        {
+            "id": c.id,
+            "external_call_id": c.external_call_id,
+            "call_date": c.call_date,
+            "serial_number": c.serial_number,
+            "title": c.title,
+            "subject": c.subject,
+            "description": c.description,
+            "address": c.address,
+            "school_code": c.school_code,
+            "school_name": c.school_name,
+            "province": c.province,
+            "district": c.district,
+            "reporter_name": c.reporter_name,
+            "phone": c.phone,
+            "email": c.email,
+            "product_type": c.product_type,
+            "created_at": c.created_at,
+        }
+        for c in calls
+    ]
+
 @app.post("/transfer")
 def transfer_call(
     data: TransferPayload,
@@ -104,4 +139,3 @@ def transfer_call(
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to create record: {str(e)}")
-
