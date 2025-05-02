@@ -4,4 +4,5 @@ venv/
 .env
 aidata.db
 .DS_Store
-test.sh
+test_push.sh
+test_pull.sh
