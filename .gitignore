@@ -1,8 +1,4 @@
 __pycache__/
 *.pyc
 venv/
-.env
-aidata.db
 .DS_Store
-test_push.sh
-test_pull.sh

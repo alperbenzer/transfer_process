@@ -29,6 +29,8 @@ class Call(Base):
     __tablename__ = "calls"
 
     id = Column(Integer, primary_key=True, index=True)
+    status = Column(String, nullable=True)
+    doc_id = Column(String, nullable=True)
     external_call_id = Column(String, unique=True, index=True)
     call_date = Column(DateTime)
     serial_number = Column(String)
@@ -47,6 +49,7 @@ class Call(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 # Create tables
+# NOTE: Manual migration required for status and doc_id if DB already exists
 Base.metadata.create_all(bind=engine)
 
 # Pydantic Schema
@@ -86,6 +89,30 @@ def verify_calls_key(x_api_key: str = Header(...)):
 
 # API Endpoint
 
+@app.patch("/calls/{call_id}")
+def update_call(
+    call_id: int,
+    status: Optional[str] = None,
+    doc_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_calls_key)
+):
+    call = db.query(Call).filter(Call.id == call_id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+    if status is not None:
+        call.status = status
+    if doc_id is not None:
+        call.doc_id = doc_id
+    db.commit()
+    db.refresh(call)
+    return {
+        "id": call.id,
+        "status": call.status,
+        "doc_id": call.doc_id,
+        "message": "Call record updated successfully."
+    }
+
 @app.get("/calls")
 def list_calls(
     db: Session = Depends(get_db),
@@ -111,6 +138,8 @@ def list_calls(
             "email": c.email,
             "product_type": c.product_type,
             "created_at": c.created_at,
+            "status": c.status,
+            "doc_id": c.doc_id,
         }
         for c in calls
     ]
@@ -129,7 +158,7 @@ def transfer_call(
         )
 
     try:
-        call = Call(**data.dict())
+        call = Call(**data.dict(), status="AKTARILDI")
         db.add(call)
         db.commit()
         db.refresh(call)
