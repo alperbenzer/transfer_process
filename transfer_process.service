@@ -1,0 +1,15 @@
+[Unit]
+Description=Transfer Process API with Podman
+After=network.target
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/podman run --rm \
+  -p 127.0.0.1:8001:8000 \
+  --env-file=/opt/transfer_process/.env \
+  -v /opt/transfer_process/aidata.db:/app/aidata.db \
+  localhost/transfer_process
+ExecStop=/usr/bin/podman stop -a
+
+[Install]
+WantedBy=multi-user.target
