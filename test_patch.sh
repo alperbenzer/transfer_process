@@ -1,14 +1,21 @@
 #!/bin/bash
 
-if [ ! -z $1 ]
-then
+CALL_ID=$1
 
-curl -s -X PATCH http://localhost:8000/calls/$1 \
-  -H "X-API-KEY: slsk6PYL" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "status": "İNCELEMEDE",
-        "doc_id": "DOC-001"
-      }' | jq
-
+if [[ -z "$CALL_ID" ]]; then
+  echo "Kullanım: $0 <call_id>"
+  exit 1
 fi
+
+API_KEY="slsk6PYL"
+ENDPOINT="http://localhost:8000/calls/$CALL_ID"
+
+JSON=$(jq -n \
+  --arg status "TAMAMLANDI" \
+  --arg doc_id "DOC-123" \
+  '{status: $status, doc_id: $doc_id}')
+
+curl -s -X PATCH "$ENDPOINT" \
+  -H "X-API-KEY: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d "$JSON" | jq

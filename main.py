@@ -19,7 +19,7 @@ CALLS_API_KEY = os.getenv("CALLS_API_KEY")
 app = FastAPI(title="Aidata Transfer API", version="2.0")
 
 # Database setup (SQLite)
-DATABASE_URL = "sqlite:///./aidata.db"
+DATABASE_URL = "sqlite:////app/aidata.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -70,6 +70,10 @@ class TransferPayload(BaseModel):
     email: Optional[EmailStr] = None
     product_type: str
 
+class CallUpdate(BaseModel):
+    status: Optional[str] = None
+    doc_id: Optional[str] = None
+
 # Dependency
 
 def get_db():
@@ -92,20 +96,25 @@ def verify_calls_key(x_api_key: str = Header(...)):
 @app.patch("/calls/{call_id}")
 def update_call(
     call_id: int,
-    status: Optional[str] = None,
-    doc_id: Optional[str] = None,
+    payload: CallUpdate,
     db: Session = Depends(get_db),
     _: None = Depends(verify_calls_key)
 ):
+    print(f"⚠️  PATCH is being called for {call_id}")
+    print(f"📦 Gelen payload: {payload}")
     call = db.query(Call).filter(Call.id == call_id).first()
     if not call:
         raise HTTPException(status_code=404, detail="Call not found")
-    if status is not None:
-        call.status = status
-    if doc_id is not None:
-        call.doc_id = doc_id
+
+    if payload.status is not None:
+        call.status = payload.status
+    if payload.doc_id is not None:
+        call.doc_id = payload.doc_id
+
     db.commit()
     db.refresh(call)
+    print(f"✅ Yeni değerler: status={call.status}, doc_id={call.doc_id}")
+
     return {
         "id": call.id,
         "status": call.status,
