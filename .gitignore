@@ -1,8 +1,6 @@
 __pycache__/
 *.pyc
 venv/
+.DS_Store
 .env
 aidata.db
-.DS_Store
-test_push.sh
-test_pull.sh

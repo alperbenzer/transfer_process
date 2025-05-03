@@ -19,7 +19,7 @@ CALLS_API_KEY = os.getenv("CALLS_API_KEY")
 app = FastAPI(title="Aidata Transfer API", version="2.0")
 
 # Database setup (SQLite)
-DATABASE_URL = "sqlite:///./aidata.db"
+DATABASE_URL = "sqlite:////app/aidata.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -29,6 +29,8 @@ class Call(Base):
     __tablename__ = "calls"
 
     id = Column(Integer, primary_key=True, index=True)
+    status = Column(String, nullable=True)
+    doc_id = Column(String, nullable=True)
     external_call_id = Column(String, unique=True, index=True)
     call_date = Column(DateTime)
     serial_number = Column(String)
@@ -47,6 +49,7 @@ class Call(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 # Create tables
+# NOTE: Manual migration required for status and doc_id if DB already exists
 Base.metadata.create_all(bind=engine)
 
 # Pydantic Schema
@@ -67,6 +70,10 @@ class TransferPayload(BaseModel):
     email: Optional[EmailStr] = None
     product_type: str
 
+class CallUpdate(BaseModel):
+    status: Optional[str] = None
+    doc_id: Optional[str] = None
+
 # Dependency
 
 def get_db():
@@ -85,6 +92,35 @@ def verify_calls_key(x_api_key: str = Header(...)):
         raise HTTPException(status_code=401, detail="Invalid API key for calls endpoint")
 
 # API Endpoint
+
+@app.patch("/calls/{call_id}")
+def update_call(
+    call_id: int,
+    payload: CallUpdate,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_calls_key)
+):
+    print(f"⚠️  PATCH is being called for {call_id}")
+    print(f"📦 Gelen payload: {payload}")
+    call = db.query(Call).filter(Call.id == call_id).first()
+    if not call:
+        raise HTTPException(status_code=404, detail="Call not found")
+
+    if payload.status is not None:
+        call.status = payload.status
+    if payload.doc_id is not None:
+        call.doc_id = payload.doc_id
+
+    db.commit()
+    db.refresh(call)
+    print(f"✅ Yeni değerler: status={call.status}, doc_id={call.doc_id}")
+
+    return {
+        "id": call.id,
+        "status": call.status,
+        "doc_id": call.doc_id,
+        "message": "Call record updated successfully."
+    }
 
 @app.get("/calls")
 def list_calls(
@@ -111,6 +147,8 @@ def list_calls(
             "email": c.email,
             "product_type": c.product_type,
             "created_at": c.created_at,
+            "status": c.status,
+            "doc_id": c.doc_id,
         }
         for c in calls
     ]
@@ -129,7 +167,7 @@ def transfer_call(
         )
 
     try:
-        call = Call(**data.dict())
+        call = Call(**data.dict(), status="AKTARILDI")
         db.add(call)
         db.commit()
         db.refresh(call)
