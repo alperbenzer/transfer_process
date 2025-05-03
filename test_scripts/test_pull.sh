@@ -1,5 +1,5 @@
 #!/bin/bash
 
-curl -X GET http://localhost:8000/calls \
+curl -X GET http://aidata.com.tr/calls \
   -H "X-API-KEY: slsk6PYL" | jq
 

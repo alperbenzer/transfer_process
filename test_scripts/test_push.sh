@@ -3,7 +3,7 @@
 # Generate a random external_call_id
 external_call_id="TEST-$(date +%s%N | sha256sum | head -c 8)"
 
-curl -s -X POST http://localhost:8000/transfer \
+curl -s -X POST http://aidata.com.tr/transfer \
   -H "Content-Type: application/json" \
   -H "X-API-KEY: PHFVNOY9" \
   -d '{

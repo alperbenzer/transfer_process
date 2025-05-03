@@ -8,11 +8,11 @@ if [[ -z "$CALL_ID" ]]; then
 fi
 
 API_KEY="slsk6PYL"
-ENDPOINT="http://localhost:8000/calls/$CALL_ID"
+ENDPOINT="http://aidata.com.tr/calls/$CALL_ID"
 
 JSON=$(jq -n \
   --arg status "TAMAMLANDI" \
-  --arg doc_id "DOC-123" \
+  --arg doc_id "DOC-TEST123" \
   '{status: $status, doc_id: $doc_id}')
 
 curl -s -X PATCH "$ENDPOINT" \
