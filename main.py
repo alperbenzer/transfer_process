@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi import FastAPI, HTTPException, Header, Depends, Request, Body
 from pydantic import BaseModel, EmailStr
-from typing import Literal, Optional
+from typing import Optional
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
@@ -49,10 +49,9 @@ class Call(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 # Create tables
-# NOTE: Manual migration required for status and doc_id if DB already exists
 Base.metadata.create_all(bind=engine)
 
-# Pydantic Schema
+# Pydantic Schema for transfer
 class TransferPayload(BaseModel):
     external_call_id: str
     call_date: datetime
@@ -70,12 +69,7 @@ class TransferPayload(BaseModel):
     email: Optional[EmailStr] = None
     product_type: str
 
-class CallUpdate(BaseModel):
-    status: Optional[str] = None
-    doc_id: Optional[str] = None
-
 # Dependency
-
 def get_db():
     db = SessionLocal()
     try:
@@ -91,37 +85,42 @@ def verify_calls_key(x_api_key: str = Header(...)):
     if x_api_key != CALLS_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key for calls endpoint")
 
-# API Endpoint
-
+# PATCH endpoint using dict instead of Pydantic model
 @app.patch("/calls/{call_id}")
 def update_call(
     call_id: int,
-    payload: CallUpdate,
+    payload: dict = Body(...),
     db: Session = Depends(get_db),
     _: None = Depends(verify_calls_key)
 ):
-    print(f"⚠️  PATCH is being called for {call_id}")
-    print(f"📦 Gelen payload: {payload}")
     call = db.query(Call).filter(Call.id == call_id).first()
     if not call:
         raise HTTPException(status_code=404, detail="Call not found")
 
-    if payload.status is not None:
-        call.status = payload.status
-    if payload.doc_id is not None:
-        call.doc_id = payload.doc_id
+    # Güncellenebilir alanlar listesi
+    allowed_fields = ["status", "doc_id"]
+    update_fields = []
+
+    for field in allowed_fields:
+        if field in payload:
+            setattr(call, field, payload[field])
+            update_fields.append(field)
+
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No valid fields provided for update.")
 
     db.commit()
     db.refresh(call)
-    print(f"✅ Yeni değerler: status={call.status}, doc_id={call.doc_id}")
 
     return {
         "id": call.id,
+        "updated_fields": update_fields,
         "status": call.status,
         "doc_id": call.doc_id,
         "message": "Call record updated successfully."
     }
 
+# Get all calls
 @app.get("/calls")
 def list_calls(
     db: Session = Depends(get_db),
@@ -153,6 +152,7 @@ def list_calls(
         for c in calls
     ]
 
+# POST /transfer endpoint
 @app.post("/transfer")
 def transfer_call(
     data: TransferPayload,
